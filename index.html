@@ -23,7 +23,7 @@
         <h2 class="text-lg font-bold text-blue-600 mb-3 flex items-center gap-2">
           <span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> 自分のポケモン
         </h2>
-        <input id="my-search" type="text" placeholder="英語名 or 図鑑番号で検索..."
+        <input id="my-search" type="text" placeholder="日本語名・英語名・図鑑番号で検索..."
           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
         <div id="my-results" class="flex flex-wrap gap-1 max-h-44 overflow-y-auto p-1 rounded"></div>
         <div id="my-loading" class="hidden text-gray-400 text-sm text-center py-3">読み込み中...</div>
@@ -41,7 +41,7 @@
         <h2 class="text-lg font-bold text-red-600 mb-3 flex items-center gap-2">
           <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> 相手のポケモン
         </h2>
-        <input id="opp-search" type="text" placeholder="英語名 or 図鑑番号で検索..."
+        <input id="opp-search" type="text" placeholder="日本語名・英語名・図鑑番号で検索..."
           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-red-400">
         <div id="opp-results" class="flex flex-wrap gap-1 max-h-44 overflow-y-auto p-1 rounded"></div>
         <div id="opp-loading" class="hidden text-gray-400 text-sm text-center py-3">読み込み中...</div>
@@ -183,13 +183,30 @@
         });
       });
 
-      // 全ポケモンリスト取得（名前検索用）
+      // 全ポケモンリスト + 日本語名を並行取得
       try {
-        const res  = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1302&offset=0');
-        const data = await res.json();
-        allPokemon = data.results.map(p => {
+        const gqlQuery = `{ pokemon_v2_pokemonspeciesname(where: {language_id: {_eq: 11}}) { name pokemon_species_id } }`;
+        const [listRes, gqlRes] = await Promise.all([
+          fetch('https://pokeapi.co/api/v2/pokemon?limit=1302&offset=0'),
+          fetch('https://beta.pokeapi.co/graphql/v1beta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: gqlQuery })
+          })
+        ]);
+        const listData = await listRes.json();
+        const gqlData  = await gqlRes.json();
+
+        // 図鑑番号→日本語名マップ
+        const jaMap = {};
+        (gqlData.data?.pokemon_v2_pokemonspeciesname || []).forEach(n => {
+          jaMap[n.pokemon_species_id] = n.name;
+        });
+
+        allPokemon = listData.results.map(p => {
           const parts = p.url.split('/').filter(Boolean);
-          return { name: p.name, id: parseInt(parts[parts.length - 1]) };
+          const id = parseInt(parts[parts.length - 1]);
+          return { name: p.name, id, ja: jaMap[id] || p.name };
         });
       } catch (e) {
         console.error('ポケモンリスト取得失敗', e);
@@ -218,7 +235,10 @@
         const id = parseInt(query);
         matches = allPokemon.filter(p => p.id === id);
       } else {
-        matches = allPokemon.filter(p => p.name.includes(query.toLowerCase())).slice(0, 30);
+        const q = query.toLowerCase();
+        matches = allPokemon.filter(p =>
+          p.ja.includes(query) || p.name.includes(q)
+        ).slice(0, 30);
       }
 
       resultsEl.innerHTML = '';
@@ -240,8 +260,8 @@
         idSpan.className = 'text-xs text-gray-400';
         idSpan.textContent = `#${p.id}`;
         const nameSpan = document.createElement('span');
-        nameSpan.className = 'text-xs text-gray-600';
-        nameSpan.textContent = p.name;
+        nameSpan.className = 'text-xs font-medium text-gray-700';
+        nameSpan.textContent = p.ja || p.name;
         btn.appendChild(img);
         btn.appendChild(idSpan);
         btn.appendChild(nameSpan);
