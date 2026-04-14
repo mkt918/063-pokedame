@@ -135,7 +135,8 @@
     pokemon: null,
     nature: 'まじめ',
     aps: { hp:0, atk:0, def:0, spa:0, spd:0, spe:0 },
-    speMod: 1.0
+    speMod: 1.0,
+    manualSpe: null
   });
   const emptyParty = () => Array.from({length:6}, emptySlot);
 
@@ -227,7 +228,8 @@
       ...base,
       ...saved,
       aps: {...base.aps, ...(saved.aps || {})},
-      speMod: saved.speMod || 1.0
+      speMod: saved.speMod || 1.0,
+      manualSpe: saved.manualSpe !== undefined ? saved.manualSpe : null
     };
   }
 
@@ -273,7 +275,12 @@
         : 'border-2 border-gray-200 rounded-xl p-2 text-center cursor-pointer hover:border-gray-400 transition';
 
       if (slot.pokemon) {
-        let spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+        let spe;
+        if (slot.manualSpe !== null) {
+          spe = slot.manualSpe;
+        } else {
+          spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+        }
         if (slot.speMod && slot.speMod !== 1.0) spe = Math.floor(spe * slot.speMod);
         const nd  = NATURES.find(n => n.name === slot.nature);
         const speTag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
@@ -350,19 +357,33 @@
             <div class="flex items-center gap-2 min-w-[140px]">
               <input type="range" id="${side}-ap-${key}-range" value="${ap}" min="0" max="${maxAP}"
                 class="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-${ac}-500"
+                ${isSpe && slot.manualSpe !== null ? 'disabled opacity-30' : ''}
                 oninput="syncSlotAP('${side}',${activeSlot},'${key}',this.value)"
                 onchange="afterSlotUpdate('${side}',${activeSlot})">
               <input type="number" id="${side}-ap-${key}-number" value="${ap}" min="0" max="${maxAP}"
                 class="w-10 border rounded px-1 py-0.5 text-xs text-center shrink-0"
+                ${isSpe && slot.manualSpe !== null ? 'disabled opacity-30' : ''}
                 oninput="syncSlotAP('${side}',${activeSlot},'${key}',this.value)"
                 onchange="afterSlotUpdate('${side}',${activeSlot})">
               <button onclick="setMaxAP('${side}',${activeSlot},'${key}')"
-                class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 border rounded hover:bg-gray-200 shrink-0">
+                class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 border rounded hover:bg-gray-200 shrink-0"
+                ${isSpe && slot.manualSpe !== null ? 'disabled opacity-30' : ''}>
                 MAX
               </button>
             </div>
             ${isSpe ? `
-              <div class="flex gap-1 mt-1 text-[10px]">
+              <div class="flex items-center gap-1 mt-2 mb-2 p-1.5 bg-gray-50 rounded border border-gray-100">
+                <input type="checkbox" id="${side}-spe-manual-check" ${slot.manualSpe !== null ? 'checked' : ''}
+                  onchange="updateSlotManualSpe('${side}',${activeSlot},this.checked ? (parseInt(document.getElementById('${side}-spe-manual-input').value) || 0) : null)">
+                <label for="${side}-spe-manual-check" class="text-[10px] text-gray-500 font-bold shrink-0">実数値手動入力</label>
+                <input type="number" id="${side}-spe-manual-input" value="${slot.manualSpe !== null ? slot.manualSpe : calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe')}"
+                  class="w-12 border rounded px-1 py-0.5 text-xs text-center ${slot.manualSpe === null ? 'bg-gray-100 text-gray-400' : 'bg-white font-bold text-blue-600 border-blue-200'}"
+                  ${slot.manualSpe === null ? 'disabled' : ''}
+                  oninput="updateSlotManualSpe('${side}',${activeSlot},parseInt(this.value) || 0, false)"
+                  onchange="afterSlotUpdate('${side}',${activeSlot})">
+              </div>
+              <div class="flex gap-1 text-[10px] items-center">
+                <span class="text-gray-400 font-bold">アイテム等:</span>
                 <button onclick="updateSlotSpeMod('${side}',${activeSlot},1.0)" class="px-1.5 py-0.5 rounded border ${slot.speMod===1.0?'bg-gray-500 text-white':'bg-white text-gray-500'}">x1.0</button>
                 <button onclick="updateSlotSpeMod('${side}',${activeSlot},1.5)" class="px-1.5 py-0.5 rounded border ${slot.speMod===1.5?'bg-blue-500 text-white':'bg-white text-gray-500'}">x1.5 (スカーフ)</button>
                 <button onclick="updateSlotSpeMod('${side}',${activeSlot},2.0)" class="px-1.5 py-0.5 rounded border ${slot.speMod===2.0?'bg-red-500 text-white':'bg-white text-gray-500'}">x2.0 (追風/水水)</button>
@@ -370,7 +391,13 @@
             ` : ''}
           </td>
           <td id="${side}-ap-${key}-real" class="py-1.5 text-sm font-bold text-${ac}-700 whitespace-nowrap">
-            ${isSpe && slot.speMod !== 1.0 ? Math.floor(real * slot.speMod) : real}${nUp}${nDown}
+            ${(function(){
+              let sVal;
+              if (isSpe && slot.manualSpe !== null) sVal = slot.manualSpe;
+              else sVal = real;
+              if (isSpe && slot.speMod !== 1.0) sVal = Math.floor(sVal * slot.speMod);
+              return sVal;
+            })()}${nUp}${nDown}
           </td>
         </tr>`;
       }).join('');
@@ -467,7 +494,12 @@
     if (range)  range.value  = newVal;
     if (number) number.value = newVal;
     if (real && slot.pokemon) {
-      let realVal = calcStat(slot.pokemon.baseStats[key], newVal, slot.nature, key);
+      let realVal;
+      if (key === 'spe' && slot.manualSpe !== null) {
+        realVal = slot.manualSpe;
+      } else {
+        realVal = calcStat(slot.pokemon.baseStats[key], newVal, slot.nature, key);
+      }
       if (key === 'spe' && slot.speMod && slot.speMod !== 1.0) realVal = Math.floor(realVal * slot.speMod);
       const nd  = NATURES.find(n => n.name === slot.nature);
       const nUp   = nd?.plus  === key ? '<span class="text-red-500 font-bold ml-0.5">↑</span>' : '';
@@ -503,6 +535,25 @@
     const slot = getSlot(side, idx);
     slot.speMod = mod;
     afterSlotUpdate(side, idx);
+  }
+
+  function updateSlotManualSpe(side, idx, val, redraw = true) {
+    const slot = getSlot(side, idx);
+    slot.manualSpe = val;
+    if (redraw) {
+      afterSlotUpdate(side, idx);
+    } else {
+      // リアルタイム更新（Rankingなどは重いのでUIの数値のみ）
+      const real = document.getElementById(`${side}-ap-spe-real`);
+      if (real) {
+        let finalSpe = val;
+        if (slot.speMod !== 1.0) finalSpe = Math.floor(val * slot.speMod);
+        const nd  = NATURES.find(n => n.name === slot.nature);
+        const nUp   = nd?.plus  === 'spe' ? '<span class="text-red-500 font-bold ml-0.5">↑</span>' : '';
+        const nDown = nd?.minus === 'spe' ? '<span class="text-blue-500 font-bold ml-0.5">↓</span>' : '';
+        real.innerHTML = `${finalSpe}${nUp}${nDown}`;
+      }
+    }
   }
 
   // ===== モーダル =====
@@ -630,7 +681,12 @@
 
     myParties[myActive].forEach((slot, i) => {
       if (!slot.pokemon) return;
-      let spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+      let spe;
+      if (slot.manualSpe !== null) {
+        spe = slot.manualSpe;
+      } else {
+        spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+      }
       if (slot.speMod && slot.speMod !== 1.0) spe = Math.floor(spe * slot.speMod);
       const nd  = NATURES.find(n => n.name === slot.nature);
       const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
@@ -640,7 +696,12 @@
 
     oppParty.forEach((slot, i) => {
       if (!slot.pokemon) return;
-      let spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+      let spe;
+      if (slot.manualSpe !== null) {
+        spe = slot.manualSpe;
+      } else {
+        spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+      }
       if (slot.speMod && slot.speMod !== 1.0) spe = Math.floor(spe * slot.speMod);
       const nd  = NATURES.find(n => n.name === slot.nature);
       const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
