@@ -412,6 +412,7 @@
           else               oppActiveSlot = oppActiveSlot === idx ? null : idx;
           renderParty(side);
           renderConfig(side);
+          updateSpeedRanking(); // 🆕 選択状態の変更をランキングに即座に反映
         }
       };
       container.appendChild(div);
@@ -891,22 +892,40 @@
       });
     });
 
-    // 相手側 (3パターン想定)
+    // 相手側 (選択中なら3パターン、そうでなければ現在の設定値)
     oppParty.forEach((slot, i) => {
       if (!slot.pokemon) return;
       const base = slot.pokemon.baseStats.spe;
-      
-      // 1. 無振
-      const sMin = calcStat(base, 0, 'まじめ', 'spe');
-      entries.push({ pokemon: slot.pokemon, spe: sMin, side: 'opp', idx: i, virtual: '(無振)', nature: 'まじめ', baseSpe: base, apSpe: 0, tag: '' });
-      
-      // 2. 最速
-      const sMax = calcStat(base, 32, 'おくびょう', 'spe');
-      entries.push({ pokemon: slot.pokemon, spe: sMax, side: 'opp', idx: i, virtual: '(最速)', nature: 'おくびょう', baseSpe: base, apSpe: 32, tag: '↑' });
-      
-      // 3. 最速スカーフ
-      const sScarf = Math.floor(sMax * 1.5);
-      entries.push({ pokemon: slot.pokemon, spe: sScarf, side: 'opp', idx: i, virtual: '(最速SC)', nature: 'おくびょう', baseSpe: base, apSpe: 32, tag: '↑(SC)' });
+
+      if (i === oppActiveSlot) {
+        // 1. 無振
+        const sMin = calcStat(base, 0, 'まじめ', 'spe');
+        entries.push({ pokemon: slot.pokemon, spe: sMin, side: 'opp', idx: i, virtual: '(無振)', nature: 'まじめ', baseSpe: base, apSpe: 0, tag: '' });
+        
+        // 2. 最速
+        const sMax = calcStat(base, 32, 'おくびょう', 'spe');
+        entries.push({ pokemon: slot.pokemon, spe: sMax, side: 'opp', idx: i, virtual: '(最速)', nature: 'おくびょう', baseSpe: base, apSpe: 32, tag: '↑' });
+        
+        // 3. 最速スカーフ
+        const sScarf = Math.floor(sMax * 1.5);
+        entries.push({ pokemon: slot.pokemon, spe: sScarf, side: 'opp', idx: i, virtual: '(最速SC)', nature: 'おくびょう', baseSpe: base, apSpe: 32, tag: '↑(SC)' });
+      } else {
+        // 選択されていない場合は現在の設定値を表示
+        let spe;
+        if (slot.manualSpe !== null) {
+          spe = slot.manualSpe;
+        } else {
+          spe = calcStat(base, slot.aps.spe, slot.nature, 'spe');
+        }
+        if (slot.speMod && slot.speMod !== 1.0) spe = Math.floor(spe * slot.speMod);
+        const nd  = NATURES.find(n => n.name === slot.nature);
+        const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
+        const modTag = slot.speMod === 1.5 ? '(SC)' : slot.speMod === 2.0 ? '(TW)' : '';
+        entries.push({ 
+          pokemon: slot.pokemon, spe, nature: slot.nature, tag: tag + modTag, 
+          baseSpe: base, apSpe: slot.aps.spe, side: 'opp', idx: i 
+        });
+      }
     });
 
     const rankEl = document.getElementById('speed-ranking');
