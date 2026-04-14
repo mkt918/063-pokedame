@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh workflow:*)",
+      "Bash(gh run:*)",
+      "Bash(git branch:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(curl -s -X POST https://beta.pokeapi.co/graphql/v1beta -H 'Content-Type: application/json' -d '{\"query\":\"{ pokemon_v2_pokemonspeciesname\\(where: {language_id: {_eq: 11}}, limit: 3\\) { name pokemon_species_id } }\"}')",
+      "WebFetch(domain:yakkun.com)",
+      "WebSearch"
     ]
   }
 }
