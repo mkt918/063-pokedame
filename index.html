@@ -82,14 +82,14 @@
     <p class="text-sm text-gray-400 mb-5">速い順・最大12体表示</p>
     
     <!-- 🆕 数直線タイムライン -->
-    <div class="relative bg-gray-50 rounded-xl border border-gray-100 p-4 pt-10 mb-6 min-h-[140px] overflow-x-auto">
-      <div id="speed-timeline-axis" class="absolute left-6 right-6 h-0.5 bg-gray-300 top-[60px]">
+    <div id="speed-timeline-container" class="relative bg-gray-50 rounded-xl border border-gray-100 p-4 mb-6 min-h-[220px] overflow-x-auto overflow-y-hidden">
+      <div id="speed-timeline-axis" class="absolute left-6 right-6 h-0.5 bg-gray-300 top-1/2 -translate-y-1/2">
         <!-- 目盛りなどはJSで生成 -->
       </div>
-      <div id="speed-timeline-pins" class="absolute left-6 right-6 top-[60px] h-0">
+      <div id="speed-timeline-pins" class="absolute left-6 right-6 top-1/2 h-0">
         <!-- ポケモンアイコンがここに並ぶ -->
       </div>
-      <div id="speed-timeline-labels" class="absolute left-6 right-6 top-[65px] flex justify-between text-[10px] text-gray-400 font-mono">
+      <div id="speed-timeline-labels" class="absolute left-6 right-6 bottom-2 flex justify-between text-[10px] text-gray-400 font-mono">
         <!-- 数値ラベル -->
       </div>
     </div>
@@ -859,6 +859,7 @@
   function updateSpeedRanking() {
     const entries = [];
 
+    // 自分側
     myParties[myActive].forEach((slot, i) => {
       if (!slot.pokemon) return;
       let spe;
@@ -871,22 +872,28 @@
       const nd  = NATURES.find(n => n.name === slot.nature);
       const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
       const modTag = slot.speMod === 1.5 ? '(SC)' : slot.speMod === 2.0 ? '(TW)' : '';
-      entries.push({ pokemon: slot.pokemon, spe, nature: slot.nature, tag: tag + modTag, baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'my', idx: i });
+      entries.push({ 
+        pokemon: slot.pokemon, spe, nature: slot.nature, tag: tag + modTag, 
+        baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'my', idx: i 
+      });
     });
 
+    // 相手側 (3パターン想定)
     oppParty.forEach((slot, i) => {
       if (!slot.pokemon) return;
-      let spe;
-      if (slot.manualSpe !== null) {
-        spe = slot.manualSpe;
-      } else {
-        spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
-      }
-      if (slot.speMod && slot.speMod !== 1.0) spe = Math.floor(spe * slot.speMod);
-      const nd  = NATURES.find(n => n.name === slot.nature);
-      const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
-      const modTag = slot.speMod === 1.5 ? '(SC)' : slot.speMod === 2.0 ? '(TW)' : '';
-      entries.push({ pokemon: slot.pokemon, spe, nature: slot.nature, tag: tag + modTag, baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'opp', idx: i });
+      const base = slot.pokemon.baseStats.spe;
+      
+      // 1. 無振
+      const sMin = calcStat(base, 0, 'まじめ', 'spe');
+      entries.push({ pokemon: slot.pokemon, spe: sMin, side: 'opp', idx: i, virtual: '(無振)', nature: 'まじめ', baseSpe: base, apSpe: 0, tag: '' });
+      
+      // 2. 最速
+      const sMax = calcStat(base, 32, 'おくびょう', 'spe');
+      entries.push({ pokemon: slot.pokemon, spe: sMax, side: 'opp', idx: i, virtual: '(最速)', nature: 'おくびょう', baseSpe: base, apSpe: 32, tag: '↑' });
+      
+      // 3. 最速スカーフ
+      const sScarf = Math.floor(sMax * 1.5);
+      entries.push({ pokemon: slot.pokemon, spe: sScarf, side: 'opp', idx: i, virtual: '(最速SC)', nature: 'おくびょう', baseSpe: base, apSpe: 32, tag: '↑(SC)' });
     });
 
     const rankEl = document.getElementById('speed-ranking');
@@ -900,13 +907,12 @@
     const minVal = Math.min(...entries.map(e => e.spe));
     const rangeVal = Math.max(1, maxVal - minVal);
 
-    // 🆕 タイムライン描画
+    // タイムライン描画
     const timelinePins   = document.getElementById('speed-timeline-pins');
     const timelineLabels = document.getElementById('speed-timeline-labels');
     timelinePins.innerHTML = '';
     
     // 目盛りラベル作成
-    const labelStep = rangeVal > 50 ? 50 : 20;
     const startL = Math.floor(minVal / 10) * 10;
     const endL   = Math.ceil(maxVal / 10) * 10;
     let labelHTML = '';
@@ -918,7 +924,7 @@
     }
     timelineLabels.innerHTML = labelHTML;
 
-    // ポケモンピン配置（重なり考慮）
+    // ポケモンピン配置
     const speGroups = {};
     entries.forEach(e => {
       if (!speGroups[e.spe]) speGroups[e.spe] = [];
@@ -929,26 +935,48 @@
       const group = speGroups[spe];
       const left = ((spe - minVal) / (rangeVal || 1)) * 100;
       
-      group.forEach((e, gi) => {
+      const myEntries = group.filter(e => e.side === 'my');
+      const oppEntries = group.filter(e => e.side === 'opp');
+
+      // 自分（上側）
+      myEntries.forEach((e, gi) => {
         const pin = document.createElement('div');
-        pin.className = 'absolute bottom-0 flex flex-col items-center group z-10';
+        pin.className = 'absolute bottom-0 flex flex-col items-center group z-20';
         pin.style.left = `${left}%`;
         pin.style.transform = 'translateX(-50%)';
-        const yOffset = gi * 28; // 重なっている場合に上にずらす
-        
-        const isMy = e.side === 'my';
-        const borderColor = isMy ? 'border-blue-500' : 'border-red-400';
-        const bgColor = isMy ? 'bg-blue-500' : 'bg-red-400';
+        const yOffset = gi * 30 + 10; 
 
         pin.innerHTML = `
-          <div class="relative flex flex-col items-center" style="margin-bottom: ${yOffset}px">
-            <div class="bg-white border-2 ${borderColor} rounded-full p-0.5 shadow-sm hover:scale-125 transition-transform cursor-help">
-              <img src="${e.pokemon.sprite}" class="w-6 h-6 object-contain">
+          <div class="relative flex flex-col-reverse items-center" style="margin-bottom: ${yOffset}px">
+            <div class="bg-white border-2 border-blue-500 rounded-full p-0.5 shadow-sm hover:scale-125 transition-transform cursor-help">
+              <img src="${e.pokemon.sprite}" class="w-7 h-7 object-contain">
             </div>
-            <div class="${bgColor} text-white font-mono font-bold text-[8px] px-1 rounded absolute -top-3 whitespace-nowrap">
+            <div class="bg-blue-500 text-white font-mono font-bold text-[8px] px-1 rounded absolute -top-3 whitespace-nowrap z-30">
               ${spe}
             </div>
-            <div class="w-0.5 h-10 ${bgColor} opacity-20 absolute top-7 -z-10"></div>
+            <div class="w-0.5 bg-blue-500 opacity-20 absolute -z-10" style="height: ${yOffset}px; bottom: -${yOffset}px"></div>
+          </div>
+        `;
+        timelinePins.appendChild(pin);
+      });
+
+      // 相手（下側）
+      oppEntries.forEach((e, gi) => {
+        const pin = document.createElement('div');
+        pin.className = 'absolute top-0 flex flex-col items-center group z-10';
+        pin.style.left = `${left}%`;
+        pin.style.transform = 'translateX(-50%)';
+        const yOffset = gi * 30 + 10;
+
+        pin.innerHTML = `
+          <div class="relative flex flex-col items-center" style="margin-top: ${yOffset}px">
+            <div class="bg-white border-2 border-red-400 rounded-full p-0.5 shadow-sm hover:scale-125 transition-transform cursor-help">
+              <img src="${e.pokemon.sprite}" class="w-7 h-7 object-contain grayscale-[0.3]">
+            </div>
+            <div class="bg-red-400 text-white font-mono font-bold text-[8px] px-1 rounded absolute -bottom-3 whitespace-nowrap z-30">
+              ${spe}
+            </div>
+            <div class="w-0.5 bg-red-400 opacity-20 absolute -z-10" style="height: ${yOffset}px; top: -${yOffset}px"></div>
           </div>
         `;
         timelinePins.appendChild(pin);
@@ -972,14 +1000,14 @@
       const isTied  = speCount[e.spe] > 1;
       const barClass  = isMy ? 'bg-blue-500'  : 'bg-red-400';
       const tagBg     = isMy ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600';
-      const teamLabel = isMy ? '自分' : '相手';
+      const teamLabel = isMy ? '自分' : `相手${e.virtual || ''}`;
       const rankColor = rank === 1 ? 'text-yellow-500' : rank <= 3 ? 'text-gray-500' : 'text-gray-300';
 
       const row = document.createElement('div');
-      row.className = 'flex items-center gap-3 py-2.5 border-b border-gray-100 last:border-0';
+      row.className = `flex items-center gap-3 py-2.5 border-b border-gray-100 last:border-0 ${e.virtual ? 'bg-red-50/30' : ''}`;
       row.innerHTML = `
         <div class="text-base font-black ${rankColor} w-7 text-center shrink-0">${rank}</div>
-        <img src="${e.pokemon.sprite}" alt="" class="w-11 h-11 object-contain shrink-0">
+        <img src="${e.pokemon.sprite}" alt="" class="w-11 h-11 object-contain shrink-0 ${e.virtual ? 'grayscale-[0.5]' : ''}">
         <div class="w-32 shrink-0 min-w-0">
           <p class="text-sm font-bold text-gray-800 leading-tight truncate">${e.pokemon.jaName}</p>
           <p class="text-xs text-gray-400">${e.nature}・種${e.baseSpe}・AP${e.apSpe}</p>
