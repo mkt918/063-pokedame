@@ -949,7 +949,10 @@
     const endL   = Math.ceil(maxVal / 10) * 10;
     let labelHTML = '';
     for (let l = startL; l <= endL; l += 20) {
-      const left = ((l - minVal) / (rangeVal || 1)) * 100;
+      let left;
+      if (rangeVal === 0) left = 50;
+      else left = 5 + ((l - minVal) / rangeVal) * 90;
+
       if (left >= 0 && left <= 100) {
         labelHTML += `<span style="position:absolute; left:${left}%; transform:translateX(-50%)">${l}</span>`;
       }
@@ -966,7 +969,9 @@
 
     Object.keys(speGroups).forEach(spe => {
       const group = speGroups[spe];
-      const left = ((spe - minVal) / (rangeVal || 1)) * 100;
+      let left;
+      if (rangeVal === 0) left = 50;
+      else left = 5 + ((spe - minVal) / rangeVal) * 90;
       
       const myEntries = group.filter(e => e.side === 'my');
       const oppEntries = group.filter(e => e.side === 'opp');
