@@ -344,15 +344,21 @@
           <td class="py-1.5 pr-3 text-xs text-center text-gray-500">${base}</td>
           <td class="py-1.5 pr-3">
             <div class="flex items-center gap-2 min-w-[140px]">
-              <input type="range" value="${ap}" min="0" max="${maxAP}"
+              <input type="range" id="${side}-ap-${key}-range" value="${ap}" min="0" max="${maxAP}"
                 class="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-${ac}-500"
-                oninput="updateSlotAP('${side}',${activeSlot},'${key}',this.value)">
-              <input type="number" value="${ap}" min="0" max="${maxAP}"
+                oninput="syncSlotAP('${side}',${activeSlot},'${key}',this.value)"
+                onchange="afterSlotUpdate('${side}',${activeSlot})">
+              <input type="number" id="${side}-ap-${key}-number" value="${ap}" min="0" max="${maxAP}"
                 class="w-10 border rounded px-1 py-0.5 text-xs text-center shrink-0"
-                onchange="updateSlotAP('${side}',${activeSlot},'${key}',this.value)">
+                oninput="syncSlotAP('${side}',${activeSlot},'${key}',this.value)"
+                onchange="afterSlotUpdate('${side}',${activeSlot})">
+              <button onclick="setMaxAP('${side}',${activeSlot},'${key}')"
+                class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 border rounded hover:bg-gray-200 shrink-0">
+                MAX
+              </button>
             </div>
           </td>
-          <td class="py-1.5 text-sm font-bold text-${ac}-700 whitespace-nowrap">
+          <td id="${side}-ap-${key}-real" class="py-1.5 text-sm font-bold text-${ac}-700 whitespace-nowrap">
             ${real}${nUp}${nDown}
           </td>
         </tr>`;
@@ -369,7 +375,8 @@
           </div>
           <div class="ml-auto text-right">
             <p class="text-xs text-gray-400">残り能力ポイント</p>
-            <p class="text-2xl font-black ${remainAP <= 0 ? 'text-red-500' : 'text-gray-700'}">${remainAP}
+            <p class="text-2xl font-black ${remainAP <= 0 ? 'text-red-500' : 'text-gray-700'}">
+              <span id="${side}-remain-ap">${remainAP}</span>
               <span class="text-sm font-normal text-gray-400">/ ${AP_MAX_TOTAL}</span>
             </p>
           </div>
@@ -433,6 +440,51 @@
     renderParty(side);
     renderConfig(side);
     updateSpeedRanking();
+  }
+
+  // ドラッグ中などの高速更新用
+  function syncSlotAP(side, idx, key, val) {
+    const slot = getSlot(side, idx);
+    let newVal = Math.min(AP_MAX_SINGLE, Math.max(0, parseInt(val) || 0));
+    const totalOther = Object.entries(slot.aps).filter(([k]) => k !== key).reduce((s, [, v]) => s + v, 0);
+    newVal = Math.min(newVal, AP_MAX_TOTAL - totalOther);
+    slot.aps[key] = newVal;
+
+    const range  = document.getElementById(`${side}-ap-${key}-range`);
+    const number = document.getElementById(`${side}-ap-${key}-number`);
+    const real   = document.getElementById(`${side}-ap-${key}-real`);
+    if (range)  range.value  = newVal;
+    if (number) number.value = newVal;
+    if (real && slot.pokemon) {
+      const realVal = calcStat(slot.pokemon.baseStats[key], newVal, slot.nature, key);
+      const nd  = NATURES.find(n => n.name === slot.nature);
+      const nUp   = nd?.plus  === key ? '<span class="text-red-500 font-bold ml-0.5">↑</span>' : '';
+      const nDown = nd?.minus === key ? '<span class="text-blue-500 font-bold ml-0.5">↓</span>' : '';
+      real.innerHTML = `${realVal}${nUp}${nDown}`;
+    }
+
+    const totalAP = Object.values(slot.aps).reduce((s,v) => s+v, 0);
+    const remainAP = AP_MAX_TOTAL - totalAP;
+    const remainEl = document.getElementById(`${side}-remain-ap`);
+    if (remainEl) {
+      remainEl.textContent = remainAP;
+      remainEl.parentElement.className = `text-2xl font-black ${remainAP <= 0 ? 'text-red-500' : 'text-gray-700'}`;
+    }
+
+    // 他ステータスの最大値を制限してスライダーの可動範囲を更新
+    STAT_KEYS.forEach(k => {
+      const r = document.getElementById(`${side}-ap-${k}-range`);
+      const n = document.getElementById(`${side}-ap-${k}-number`);
+      if (r) r.max = Math.min(AP_MAX_SINGLE, slot.aps[k] + remainAP);
+      if (n) n.max = Math.min(AP_MAX_SINGLE, slot.aps[k] + remainAP);
+    });
+  }
+
+  function setMaxAP(side, idx, key) {
+    const slot = getSlot(side, idx);
+    const totalOther = Object.entries(slot.aps).filter(([k]) => k !== key).reduce((s, [, v]) => s + v, 0);
+    const maxVal = Math.min(AP_MAX_SINGLE, AP_MAX_TOTAL - totalOther);
+    updateSlotAP(side, idx, key, maxVal);
   }
 
   // ===== モーダル =====
