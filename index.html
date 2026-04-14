@@ -9,22 +9,52 @@
 <body class="bg-gray-100 min-h-screen">
 
 <!-- ポケモン検索モーダル -->
-<div id="modal" class="fixed inset-0 bg-black/60 z-50"
+<div id="modal" class="fixed inset-0 bg-black/60 z-50 p-4"
   style="display:none; align-items:center; justify-content:center;">
-  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4"
-    style="max-height:90vh; display:flex; flex-direction:column;">
-    <h3 class="font-bold text-lg mb-3">ポケモンを選択</h3>
-    <input id="modal-search" type="text" placeholder="日本語名・英語名・図鑑番号で検索..."
-      class="w-full border rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-      autocomplete="off">
-    <div id="modal-results" class="flex flex-wrap gap-1 overflow-y-auto p-1" style="flex:1; min-height:120px;"></div>
-    <div class="flex gap-3 mt-4 pt-4 border-t shrink-0">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col"
+    style="max-height:90vh;">
+    <div class="p-4 border-b flex justify-between items-center bg-gray-50 shrink-0">
+      <h3 class="font-bold">ポケモンを選択</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+    
+    <!-- タブボタン -->
+    <div class="flex border-b text-xs font-bold shrink-0">
+      <button id="tab-btn-single" onclick="setModalTab('single')" class="flex-1 py-3 border-b-2 transition">シングルバトル</button>
+      <button id="tab-btn-double" onclick="setModalTab('double')" class="flex-1 py-3 border-b-2 transition">ダブルバトル</button>
+      <button id="tab-btn-search" onclick="setModalTab('search')" class="flex-1 py-3 border-b-2 transition">検索結果</button>
+    </div>
+
+    <div class="p-4 overflow-y-auto flex-1">
+      <div class="sticky top-0 bg-white pb-2 z-10">
+        <input id="modal-search" type="text" placeholder="名前・番号で検索..."
+          class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          autocomplete="off">
+      </div>
+
+      <!-- シングルタブ -->
+      <div id="tab-pane-single" class="hidden">
+        <div id="quick-list-single" class="grid grid-cols-3 gap-2"></div>
+      </div>
+      
+      <!-- ダブルタブ -->
+      <div id="tab-pane-double" class="hidden">
+        <div id="quick-list-double" class="grid grid-cols-3 gap-2"></div>
+      </div>
+
+      <!-- 検索結果タブ -->
+      <div id="tab-pane-search" class="hidden">
+        <div id="modal-results" class="flex flex-wrap gap-1 p-1"></div>
+      </div>
+    </div>
+
+    <div class="p-4 border-t bg-gray-50 flex gap-3 shrink-0">
       <button onclick="clearSlot()"
-        class="flex-1 py-2 rounded-lg border border-red-300 text-red-500 text-sm hover:bg-red-50">
+        class="flex-1 py-2 rounded-lg border border-red-300 text-red-500 text-xs hover:bg-red-50">
         スロットをクリア
       </button>
       <button onclick="closeModal()"
-        class="flex-1 py-2 rounded-lg border text-gray-600 text-sm hover:bg-gray-50">
+        class="flex-1 py-2 rounded-lg border text-gray-600 text-xs hover:bg-gray-50">
         キャンセル
       </button>
     </div>
@@ -140,12 +170,46 @@
   });
   const emptyParty = () => Array.from({length:6}, emptySlot);
 
+  // よくあるポケモン定義
+  const COMMON_SINGLE = [
+    { name: 'ガブリアス', id: 'garchomp' },
+    { name: 'メガリザードンY', id: 'charizard-mega-y' },
+    { name: 'アシレーヌ', id: 'primarina' },
+    { name: 'ブリジュラス', id: 'archaludon' },
+    { name: 'カバルドン', id: 'hippowdon' },
+    { name: 'アーマーガア', id: 'corviknight' },
+    { name: 'ミミッキュ', id: 'mimikyu-disguised' },
+    { name: 'ドドゲザン', id: 'kingambit' },
+    { name: 'メガゲンガー', id: 'gengar-mega' },
+    { name: 'サザンドラ', id: 'hydreigon' },
+    { name: 'マスカーニャ', id: 'meowscarada' },
+    { name: 'ギルガルド', id: 'aegislash-shield' },
+    { name: 'メガミミロップ', id: 'lopunny-mega' },
+    { name: 'ウォッシュロトム', id: 'rotom-wash' },
+    { name: 'キラフロル', id: 'glimmora' },
+    { name: 'メガカイリュー', id: 'dragonite' },
+    { name: 'メガマフォクシー', id: 'delphox' },
+    { name: 'メガハッサム', id: 'scizor-mega' }
+  ];
+  const COMMON_DOUBLE = [
+    { name: 'ガオガエン', id: 'incineroar' },
+    { name: 'オオニューラ', id: 'sneasler' },
+    { name: 'ガブリアス', id: 'garchomp' },
+    { name: 'ドドゲザン', id: 'kingambit' },
+    { name: 'ヤバソチャ', id: 'sinistcha' },
+    { name: 'エルフーン', id: 'whimsicott' },
+    { name: 'メガリザードンY', id: 'charizard-mega-y' },
+    { name: 'イダイトウ♂', id: 'basculegion-male' },
+    { name: 'メガバンギラス', id: 'tyranitar-mega' }
+  ];
+
   let myParties = Array.from({length:10}, emptyParty);
   let myActive  = 0;
   let oppParty  = emptyParty();
 
   let modalSide    = null;
   let modalSlotIdx = null;
+  let modalTab     = 'single'; // 'single', 'double', 'search'
   let myActiveSlot  = null;
   let oppActiveSlot = null;
   let allPokemon = [];
@@ -303,10 +367,16 @@
       }
 
       div.onclick = () => {
-        if (side === 'my') myActiveSlot  = myActiveSlot  === idx ? null : idx;
-        else               oppActiveSlot = oppActiveSlot === idx ? null : idx;
-        renderParty(side);
-        renderConfig(side);
+        if (!slot.pokemon) {
+          // 未登録なら即モーダル
+          openModal(side, idx);
+        } else {
+          // すでに登録済みなら設定タブの切り替え
+          if (side === 'my') myActiveSlot  = myActiveSlot  === idx ? null : idx;
+          else               oppActiveSlot = oppActiveSlot === idx ? null : idx;
+          renderParty(side);
+          renderConfig(side);
+        }
       };
       container.appendChild(div);
     });
@@ -560,15 +630,77 @@
   function openModal(side, idx) {
     modalSide    = side;
     modalSlotIdx = idx;
+    modalTab     = 'single';
     document.getElementById('modal-search').value = '';
     document.getElementById('modal-results').innerHTML = '';
     document.getElementById('modal').style.display = 'flex';
+    renderQuickSelect();
+    updateModalTabUI();
     setTimeout(() => document.getElementById('modal-search').focus(), 50);
   }
 
   function closeModal() {
     document.getElementById('modal').style.display = 'none';
     modalSide = null; modalSlotIdx = null;
+  }
+
+  function updateModalTabUI() {
+    ['single', 'double', 'search'].forEach(t => {
+      const btn = document.getElementById(`tab-btn-${t}`);
+      const pane = document.getElementById(`tab-pane-${t}`);
+      if (t === modalTab) {
+        btn.classList.add('border-blue-500', 'text-blue-600', 'bg-blue-50');
+        btn.classList.remove('border-transparent', 'text-gray-500');
+        pane.classList.remove('hidden');
+      } else {
+        btn.classList.remove('border-blue-500', 'text-blue-600', 'bg-blue-50');
+        btn.classList.add('border-transparent', 'text-gray-500');
+        pane.classList.add('hidden');
+      }
+    });
+  }
+
+  function setModalTab(tab) {
+    modalTab = tab;
+    updateModalTabUI();
+  }
+
+  function renderQuickSelect() {
+    const renderList = (list, containerId) => {
+      const container = document.getElementById(containerId);
+      container.innerHTML = list.map(p => `
+        <button onclick="fetchAndSetPokemon('${p.id}')" 
+          class="flex items-center gap-1 p-1 border rounded hover:bg-blue-50 transition text-left overflow-hidden">
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${getIconId(p.id)}.png" 
+            class="w-8 h-8 object-contain shrink-0" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png'">
+          <span class="text-[10px] truncate leading-tight">${p.name}</span>
+        </button>
+      `).join('');
+    };
+    renderList(COMMON_SINGLE, 'quick-list-single');
+    renderList(COMMON_DOUBLE, 'quick-list-double');
+  }
+
+  function getIconId(id) {
+    const map = {
+      'charizard-mega-y': 6,
+      'gengar-mega': 94,
+      'scizor-mega': 212,
+      'tyranitar-mega': 248,
+      'lopunny-mega': 427,
+      'mimikyu-disguised': 778,
+      'garchomp': 445,
+      'archaludon': 1022,
+      'kingambit': 983,
+      'meowscarada': 914,
+      'glimmora': 970,
+      'incineroar': 727,
+      'sneasler': 903,
+      'sinistcha': 1013,
+      'whimsicott': 547,
+      'basculegion-male': 902
+    };
+    return map[id] || (allPokemon.find(p => p.name === id)?.id) || 0;
   }
 
   function clearSlot() {
@@ -585,6 +717,11 @@
   function renderModalResults(query) {
     const resultsEl = document.getElementById('modal-results');
     if (!query) { resultsEl.innerHTML = ''; return; }
+
+    // 文字が入力されたら検索タブへ
+    if (modalTab !== 'search') {
+      setModalTab('search');
+    }
 
     let matches = [];
     if (/^\d+$/.test(query)) {
