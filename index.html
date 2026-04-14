@@ -240,25 +240,34 @@
   ];
 
   // タイプ相性表 (技タイプ -> 防御側タイプ)
-  const TYPE_CHART = {
-    normal: { rock:0.5, ghost:0, steel:0.5 },
-    fire: { fire:0.5, water:0.5, grass:2, ice:2, bug:2, rock:0.5, dragon:0.5, steel:2 },
-    water: { fire:2, water:0.5, grass:0.5, ground:2, rock:2, dragon:0.5 },
-    grass: { fire:0.5, water:2, grass:0.5, poison:0.5, ground:2, bug:0.5, rock:2, dragon:0.5, steel:0.5 },
-    electric: { water:2, grass:0.5, electric:0.5, ground:0, flying:2, dragon:0.5 },
-    ice: { fire:0.5, water:0.5, grass:2, ice:0.5, ground:2, flying:2, dragon:2, steel:0.5 },
-    fighting: { normal:2, ice:2, poison:0.5, flying:0.5, psychic:0.5, bug:0.5, rock:2, ghost:0, dark:2, steel:2, fairy:0.5 },
-    poison: { grass:2, poison:0.5, ground:0.5, rock:0.5, ghost:0.5, steel:0, fairy:2 },
-    ground: { fire:2, electric:2, grass:0.5, poison:2, bug:0.5, rock:2, flying:0, steel:2 },
-    flying: { grass:2, electric:0.5, fighting:2, bug:2, rock:0.5, steel:0.5 },
-    psychic: { fighting:2, poison:2, psychic:0.5, dark:0, steel:0.5 },
-    bug: { fire:0.5, grass:2, fighting:0.5, poison:0.5, flying:0.5, psychic:2, ghost:0.5, dark:2, steel:0.5, fairy:0.5 },
-    rock: { fire:2, ice:2, fighting:0.5, ground:0.5, flying:2, bug:2, steel:0.5 },
-    ghost: { normal:0, psychic:2, ghost:2, dark:0.5 },
-    dragon: { dragon:2, steel:0.5, fairy:0 },
-    dark: { fighting:0.5, psychic:2, ghost:2, dark:0.5, fairy:0.5 },
-    steel: { fire:0.5, water:0.5, electric:0.5, ice:2, rock:2, steel:0.5, fairy:2 },
-    fairy: { fire:0.5, fighting:2, poison:0.5, dragon:2, dark:2, steel:0.5 }
+  };
+
+  const MOVE_MAP_JA = {
+    "じしん": "earthquake", "れいとうビーム": "ice-beam", "かみなり": "thunder", "だいもんじ": "fire-blast",
+    "ハイドロポンプ": "hydro-pump", "シャドーボール": "shadow-ball", "りゅうのはどう": "dragon-pulse", 
+    "ムーンフォース": "moonblast", "インファイト": "close-combat", "ストーンエッジ": "stone-edge",
+    "エアスラッシュ": "air-slash", "テラバースト": "tera-blast", "きあいだま": "focus-blast",
+    "サイコキネシス": "psychic", "ヘドロばくだん": "sludge-bomb", "ラスターカノン": "flash-cannon",
+    "マジカルシャイン": "dazzling-gleam", "アクアブレイク": "liquidation", "ダブルウイング": "dual-wingbeat",
+    "とんぼがえり": "u-turn", "ボルトチェンジ": "volt-switch", "フレアドライブ": "flare-blitz",
+    "アイアンヘッド": "iron-head", "じゃれつく": "play-rough", "ふいうち": "sucker-punch",
+    "しんそく": "extreme-speed", "ねこだまし": "fake-out", "ねむりごな": "sleep-powder",
+    "キノコのほうし": "spore", "どくどく": "toxic", "でんじは": "thunder-wave", "おにび": "will-o-wisp",
+    "りゅうのまい": "dragon-dance", "つるぎのまい": "swords-dance", "めいそう": "calm-mind",
+    "ビルドアップ": "bulk-up", "わるだくみ": "nasty-plot", "こうそくいどう": "agility",
+    "おいかぜ": "tailwind", "トリックルーム": "trick-room", "ステルスロック": "stealth-rock",
+    "どくびし": "toxic-spikes", "まきびし": "spikes", "ねばねばネット": "sticky-web",
+    "ひかりのかべ": "light-screen", "リフレクター": "reflect", "オーロラベール": "aurora-veil",
+    "みがわり": "substitute", "まもる": "protect", "みきわめ": "detect", "こらえる": "endure",
+    "ふきとばし": "whirlwind", "ほえる": "roar", "あくび": "yawn", "アンコール": "encore",
+    "ちょうはつ": "taunt", "めいそう": "calm-mind", "１０まんボルト": "thunderbolt",
+    "なみのり": "surf", "かえんほうしゃ": "flamethrower", "エナジーボール": "energy-ball",
+    "シャドークロー": "shadow-claw", "ドラゴンクロー": "dragon-claw", "せいなるつるぎ": "sacred-sword",
+    "ボディプレス": "body-press", "ドレインパンチ": "drain-punch", "パワーウィップ": "power-whip",
+    "リーフストーム": "leaf-storm", "オーバーヒート": "overheat", "りゅうせいぐん": "draco-meteor",
+    "ゴールドラッシュ": "make-it-rain", "ルミナコリジョン": "lumina-collision", "ブラッドムーン": "blood-moon",
+    "しおふき": "spout", "ふんか": "eruption", "ギガドレイン": "giga-drain", "ドわすれ": "amnesia",
+    "たくわえる": "stockpile", "のみこむ": "swallow", "はきだす": "spit-up", "たくわえる": "stockpile"
   };
 
   let myParties = Array.from({length:10}, emptyParty);
@@ -469,30 +478,38 @@
     let statsTable = '';
     if (slot.pokemon) {
       const natureMatrixHTML = `
-        <div class="mt-2 mb-4">
-          <label class="text-xs text-gray-500 font-bold mb-2 block">性格補正（上昇：行 / 下降：列）</label>
-          <div class="grid grid-cols-6 gap-0.5 bg-gray-200 p-0.5 rounded-lg overflow-hidden border border-gray-200">
-            <div class="bg-gray-50 border-b border-r text-[9px] flex items-center justify-center text-gray-400 font-bold">↑\\↓</div>
-            ${ STAT_KEYS.filter(k=>k!=='hp').map(k => `<div class="bg-gray-50 border-b text-[10px] py-1 text-center font-bold text-blue-500">${STAT_LABELS[k].slice(0,2)}↓</div>`).join('') }
-            
-            ${ NATURE_MATRIX.map((row, rIdx) => {
-              const plusStat = STAT_KEYS.filter(k=>k!=='hp')[rIdx];
-              let rowHTML = `<div class="bg-gray-50 border-r text-[10px] py-2 text-center font-bold text-red-500 flex items-center justify-center">${STAT_LABELS[plusStat].slice(0,2)}↑</div>`;
-              rowHTML += row.map((name, cIdx) => {
-                const isSelected = slot.nature === name;
-                const isNeutral = rIdx === cIdx;
-                const colorClass = isSelected 
-                  ? 'bg-yellow-400 text-white font-bold ring-2 ring-inset ring-yellow-500 z-10' 
-                  : (isNeutral ? 'bg-white text-gray-300 hover:bg-gray-50' : 'bg-white text-gray-600 hover:bg-gray-50');
-                return `<button onclick="updateSlotNature('${side}',${activeSlot},'${name}')" 
-                  class="${colorClass} text-[10px] py-2 border-r border-b border-gray-100 transition-all leading-tight">
-                  ${name}
-                </button>`;
-              }).join('');
-              return rowHTML;
-            }).join('') }
+        <details class="mt-2 mb-4 group overflow-hidden border border-gray-100 rounded-xl bg-white shadow-sm">
+          <summary class="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 transition-colors list-none">
+            <span class="text-xs font-black text-gray-700 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              性格補正の詳細（上昇・下降）
+            </span>
+            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest group-open:hidden">Click to Expand</span>
+          </summary>
+          <div class="px-3 pb-4">
+            <div class="grid grid-cols-6 gap-0.5 bg-gray-100 p-0.5 rounded-lg overflow-hidden border border-gray-100">
+              <div class="bg-gray-50 border-b border-r text-[9px] flex items-center justify-center text-gray-400 font-bold">↑\\↓</div>
+              ${ STAT_KEYS.filter(k=>k!=='hp').map(k => `<div class="bg-gray-50 border-b text-[10px] py-1 text-center font-bold text-blue-500">${STAT_LABELS[k].slice(0,2)}↓</div>`).join('') }
+              
+              ${ NATURE_MATRIX.map((row, rIdx) => {
+                const plusStat = STAT_KEYS.filter(k=>k!=='hp')[rIdx];
+                let rowHTML = `<div class="bg-gray-50 border-r text-[10px] py-2 text-center font-bold text-red-500 flex items-center justify-center">${STAT_LABELS[plusStat].slice(0,2)}↑</div>`;
+                rowHTML += row.map((name, cIdx) => {
+                  const isSelected = slot.nature === name;
+                  const isNeutral = rIdx === cIdx;
+                  const colorClass = isSelected 
+                    ? 'bg-yellow-400 text-white font-bold ring-2 ring-inset ring-yellow-500 z-10' 
+                    : (isNeutral ? 'bg-white text-gray-200 hover:bg-gray-50' : 'bg-white text-gray-500 hover:bg-gray-50');
+                  return `<button onclick="updateSlotNature('${side}',${activeSlot},'${name}')" 
+                    class="${colorClass} text-[10px] py-2 border-r border-b border-gray-50 transition-all leading-tight">
+                    ${name}
+                  </button>`;
+                }).join('');
+                return rowHTML;
+              }).join('') }
+            </div>
           </div>
-        </div>
+        </details>
       `;
       const rows = STAT_KEYS.map(key => {
         const base = slot.pokemon.baseStats[key];
@@ -598,32 +615,38 @@
         ${slot.pokemon ? statsTable : '<p class="text-sm text-gray-400">上のボタンからポケモンを選択してください</p>'}
         
         ${side === 'opp' && slot.pokemon ? `
-          <div class="mt-6 p-4 bg-white/50 rounded-xl border border-red-100">
+          <div class="mt-6 p-4 bg-white/50 rounded-xl border border-red-100 shadow-sm">
             <h3 class="text-sm font-bold text-red-800 mb-3 flex items-center gap-2">
               🔍 ダメージから能力値を逆算予測
             </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-[10px] text-red-400 font-bold mb-1">受けた自分のポケモン</label>
-                <select id="pred-my-idx" class="w-full text-xs p-2 rounded-lg bg-white border border-red-100">
+                <label class="block text-[10px] text-red-400 font-bold mb-1 uppercase tracking-wider">受けた自分のポケモン</label>
+                <select id="pred-my-idx" class="w-full text-xs p-2.5 rounded-lg bg-white border border-red-100 focus:ring-2 focus:ring-red-100 outline-none">
                   ${myParties[myActive].map((s, i) => s.pokemon ? `<option value="${i}">${s.pokemon.jaName}</option>` : '').join('')}
                 </select>
               </div>
               <div>
-                <label class="block text-[10px] text-red-400 font-bold mb-1">使用された技（英語名）</label>
+                <label class="block text-[10px] text-red-400 font-bold mb-1 uppercase tracking-wider">使用技 (日本語可)</label>
                 <div class="relative">
-                  <input type="text" id="pred-move" class="w-full text-xs p-2 rounded-lg bg-white border border-red-100" placeholder="例: Flame Thrower">
+                  <input type="text" id="pred-move" class="w-full text-xs p-2.5 rounded-lg bg-white border border-red-100 focus:ring-2 focus:ring-red-100 outline-none" placeholder="例: じしん / Earthquake">
                 </div>
               </div>
               <div class="md:col-span-2">
-                <label class="block text-[10px] text-red-400 font-bold mb-1">受けたダメージ (%)</label>
-                <div class="flex items-center gap-2">
-                  <input type="number" id="pred-damage" class="w-full text-xs p-2 rounded-lg bg-white border border-red-100" placeholder="例: 45.2">
-                  <span class="text-xs text-red-800 font-bold">%</span>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="block text-[10px] text-red-400 font-bold uppercase tracking-wider">受けたダメージ (%)</label>
+                  <div class="flex items-center gap-1">
+                    <input type="number" id="pred-damage-num" step="0.1" value="45.0" class="w-16 text-xs text-right font-mono font-bold text-red-600 border border-red-100 rounded p-1 outline-none"
+                      oninput="document.getElementById('pred-damage-range').value = this.value">
+                    <span class="text-xs text-red-400 font-bold">%</span>
+                  </div>
                 </div>
+                <input type="range" id="pred-damage-range" min="0" max="100" step="0.1" value="45.0" 
+                  class="w-full h-2 bg-red-100 rounded-lg appearance-none cursor-pointer accent-red-500"
+                  oninput="document.getElementById('pred-damage-num').value = this.value">
               </div>
             </div>
-            <button id="pred-btn" class="w-full bg-red-500 text-white rounded-lg py-2.5 text-xs font-bold hover:bg-red-600 transition-colors mt-4 shadow-md">
+            <button id="pred-btn" class="w-full bg-red-500 text-white rounded-lg py-3 text-xs font-black hover:bg-red-600 transition-all mt-4 shadow-md active:scale-[0.98]">
               シミュレーション実行・予測
             </button>
             <div id="pred-result" class="mt-4 hidden border-t border-red-100 pt-3"></div>
@@ -635,8 +658,8 @@
     if (side === 'opp' && slot.pokemon) {
       document.getElementById('pred-btn').onclick = async () => {
         const myIdx = parseInt(document.getElementById('pred-my-idx').value);
-        const moveName = document.getElementById('pred-move').value.trim();
-        const damage = parseFloat(document.getElementById('pred-damage').value);
+        const moveNameRaw = document.getElementById('pred-move').value.trim();
+        const damage = parseFloat(document.getElementById('pred-damage-num').value);
         const resultArea = document.getElementById('pred-result');
 
         if (!moveName || isNaN(damage)) return alert('技名とダメージを入力してください');
@@ -644,7 +667,8 @@
         resultArea.innerHTML = '<p class="text-[10px] text-center text-red-400 py-4 animate-pulse">計算中...</p>';
         resultArea.classList.remove('hidden');
 
-        const moveData = await fetchMoveData(moveName);
+        const moveNameEn = MOVE_MAP_JA[moveNameRaw] || moveNameRaw;
+        const moveData = await fetchMoveData(moveNameEn);
         if (!moveData) {
           resultArea.innerHTML = '<p class="text-[10px] text-center text-red-500 font-bold">技データが見つかりませんでした。正確な英語名（例: Dragon Pulse）を入力してください。</p>';
           return;
