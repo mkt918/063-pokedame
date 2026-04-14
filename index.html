@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ポケモン すばやさ・パーティ比較</title>
+  <title>ポケモンチャンピオンズ すばやさ・パーティ比較</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -32,8 +32,8 @@
 </div>
 
 <header class="bg-white shadow-sm py-4 mb-6">
-  <h1 class="text-2xl font-bold text-center text-gray-800">ポケモン すばやさ・パーティ比較</h1>
-  <p class="text-center text-gray-400 text-sm mt-1">PokéAPI 使用</p>
+  <h1 class="text-2xl font-bold text-center text-gray-800">ポケモンチャンピオンズ すばやさ・パーティ比較</h1>
+  <p class="text-center text-gray-400 text-sm mt-1">Lv50固定 / 個体値31固定 / PokéAPI使用</p>
 </header>
 
 <main class="max-w-6xl mx-auto px-4 pb-16">
@@ -49,7 +49,7 @@
         <span class="px-2 py-1 bg-red-100 text-red-600 rounded-full font-bold">■ 相手</span>
       </div>
     </div>
-    <p class="text-sm text-gray-400 mb-5">速い順・12体まで表示</p>
+    <p class="text-sm text-gray-400 mb-5">速い順・最大12体表示</p>
     <div id="speed-ranking">
       <p class="text-gray-400 text-center py-10">パーティにポケモンを登録してください</p>
     </div>
@@ -94,6 +94,13 @@
   // ===== 定数 =====
   const STAT_KEYS   = ['hp','atk','def','spa','spd','spe'];
   const STAT_LABELS = { hp:'HP', atk:'こうげき', def:'ぼうぎょ', spa:'とくこう', spd:'とくぼう', spe:'すばやさ' };
+  // チャンピオンズ固定値
+  const FIXED_LV = 50;
+  const FIXED_IV = 31;
+  // 能力ポイント制限
+  const AP_MAX_SINGLE = 32;
+  const AP_MAX_TOTAL  = 66;
+
   const NATURES = [
     { name:'まじめ',     plus:null,  minus:null  },
     { name:'がんばりや', plus:null,  minus:null  },
@@ -122,13 +129,12 @@
     { name:'むじゃき',   plus:'spe', minus:'spd' },
   ];
 
-  // ===== データ =====
+  // ===== データ構造 =====
+  // aps = 能力ポイント（旧:努力値）
   const emptySlot  = () => ({
     pokemon: null,
-    lv: 50,
     nature: 'まじめ',
-    ivs: { hp:31, atk:31, def:31, spa:31, spd:31, spe:31 },
-    evs: { hp:0,  atk:0,  def:0,  spa:0,  spd:0,  spe:0  }
+    aps: { hp:0, atk:0, def:0, spa:0, spd:0, spe:0 }
   });
   const emptyParty = () => Array.from({length:6}, emptySlot);
 
@@ -136,15 +142,10 @@
   let myActive  = 0;
   let oppParty  = emptyParty();
 
-  // モーダル対象
   let modalSide    = null;
   let modalSlotIdx = null;
-
-  // 選択中スロット（設定パネル）
   let myActiveSlot  = null;
   let oppActiveSlot = null;
-
-  // 全ポケモンリスト
   let allPokemon = [];
 
   // ===== 初期化 =====
@@ -166,7 +167,6 @@
       ]);
       const listData = await listRes.json();
       const gqlData  = await gqlRes.json();
-
       const jaMap = {};
       (gqlData.data?.pokemon_v2_pokemonspeciesname || []).forEach(n => {
         jaMap[n.pokemon_species_id] = n.name;
@@ -180,14 +180,11 @@
       console.error('API初期化失敗', e);
     }
 
-    // モーダル検索
     let timer;
     document.getElementById('modal-search').addEventListener('input', e => {
       clearTimeout(timer);
       timer = setTimeout(() => renderModalResults(e.target.value.trim()), 250);
     });
-
-    // モーダル背景クリックで閉じる
     document.getElementById('modal').addEventListener('click', e => {
       if (e.target === document.getElementById('modal')) closeModal();
     });
@@ -196,15 +193,15 @@
   // ===== ローカルストレージ =====
   function saveState() {
     try {
-      localStorage.setItem('pokedame_parties', JSON.stringify(myParties));
-      localStorage.setItem('pokedame_opp',     JSON.stringify(oppParty));
-      localStorage.setItem('pokedame_active',  myActive.toString());
+      localStorage.setItem('pokedame_parties_v2', JSON.stringify(myParties));
+      localStorage.setItem('pokedame_opp_v2',     JSON.stringify(oppParty));
+      localStorage.setItem('pokedame_active',      myActive.toString());
     } catch(e) {}
   }
 
   function loadState() {
     try {
-      const mp = localStorage.getItem('pokedame_parties');
+      const mp = localStorage.getItem('pokedame_parties_v2');
       if (mp) {
         const loaded = JSON.parse(mp);
         myParties = Array.from({length:10}, (_, i) =>
@@ -213,7 +210,7 @@
             : emptyParty()
         );
       }
-      const op = localStorage.getItem('pokedame_opp');
+      const op = localStorage.getItem('pokedame_opp_v2');
       if (op) {
         const loaded = JSON.parse(op);
         oppParty = Array.from({length:6}, (_, i) => loaded[i] ? mergeSlot(loaded[i]) : emptySlot());
@@ -228,8 +225,7 @@
     return {
       ...base,
       ...saved,
-      ivs: {...base.ivs, ...(saved.ivs || {})},
-      evs: {...base.evs, ...(saved.evs || {})}
+      aps: {...base.aps, ...(saved.aps || {})}
     };
   }
 
@@ -239,9 +235,8 @@
     container.innerHTML = '';
     for (let i = 0; i < 10; i++) {
       const btn = document.createElement('button');
-      const isActive = i === myActive;
       btn.textContent = `パーティ${i + 1}`;
-      btn.className = isActive
+      btn.className = i === myActive
         ? 'px-3 py-1.5 rounded-lg text-sm font-bold bg-blue-500 text-white shadow'
         : 'px-3 py-1.5 rounded-lg text-sm font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition';
       btn.onclick = () => {
@@ -258,10 +253,7 @@
   }
 
   // ===== パーティ表示 =====
-  function renderBothParties() {
-    renderParty('my');
-    renderParty('opp');
-  }
+  function renderBothParties() { renderParty('my'); renderParty('opp'); }
 
   function renderParty(side) {
     const party      = side === 'my' ? myParties[myActive] : oppParty;
@@ -272,23 +264,22 @@
     party.forEach((slot, idx) => {
       const isSelected = activeSlot === idx;
       const div = document.createElement('div');
-      if (isSelected) {
-        div.className = side === 'my'
-          ? 'border-2 border-blue-400 bg-blue-50 rounded-xl p-2 text-center cursor-pointer transition'
-          : 'border-2 border-red-400 bg-red-50 rounded-xl p-2 text-center cursor-pointer transition';
-      } else {
-        div.className = 'border-2 border-gray-200 rounded-xl p-2 text-center cursor-pointer hover:border-gray-400 transition';
-      }
+      div.className = isSelected
+        ? (side === 'my'
+            ? 'border-2 border-blue-400 bg-blue-50 rounded-xl p-2 text-center cursor-pointer transition'
+            : 'border-2 border-red-400 bg-red-50 rounded-xl p-2 text-center cursor-pointer transition')
+        : 'border-2 border-gray-200 rounded-xl p-2 text-center cursor-pointer hover:border-gray-400 transition';
 
       if (slot.pokemon) {
-        const spe = calcStat(slot.pokemon.baseStats.spe, slot.ivs.spe, slot.evs.spe, slot.lv, slot.nature, 'spe');
+        const spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
         const nd  = NATURES.find(n => n.name === slot.nature);
         const speTag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
         const speColor = side === 'my' ? 'text-blue-600' : 'text-red-600';
+        const totalAP = Object.values(slot.aps).reduce((s,v) => s+v, 0);
         div.innerHTML = `
           <img src="${slot.pokemon.sprite}" alt="" class="w-14 h-14 mx-auto object-contain">
           <p class="text-xs font-bold text-gray-700 leading-tight mt-1 truncate" title="${slot.pokemon.jaName}">${slot.pokemon.jaName}</p>
-          <p class="text-xs text-gray-400">Lv${slot.lv}</p>
+          <p class="text-xs text-gray-400">${slot.nature}・AP${totalAP}</p>
           <p class="text-sm font-bold ${speColor}">⚡${spe}${speTag}</p>
         `;
       } else {
@@ -301,15 +292,11 @@
       }
 
       div.onclick = () => {
-        if (side === 'my') {
-          myActiveSlot  = myActiveSlot  === idx ? null : idx;
-        } else {
-          oppActiveSlot = oppActiveSlot === idx ? null : idx;
-        }
+        if (side === 'my') myActiveSlot  = myActiveSlot  === idx ? null : idx;
+        else               oppActiveSlot = oppActiveSlot === idx ? null : idx;
         renderParty(side);
         renderConfig(side);
       };
-
       container.appendChild(div);
     });
 
@@ -329,9 +316,11 @@
     }
     configEl.classList.remove('hidden');
 
-    const slot = party[activeSlot];
-    const ac   = side === 'my' ? 'blue' : 'red';
-    const nd   = NATURES.find(n => n.name === slot.nature);
+    const slot    = party[activeSlot];
+    const ac      = side === 'my' ? 'blue' : 'red';
+    const nd      = NATURES.find(n => n.name === slot.nature);
+    const totalAP = Object.values(slot.aps).reduce((s,v) => s+v, 0);
+    const remainAP = AP_MAX_TOTAL - totalAP;
 
     const natureOpts = NATURES.map(n =>
       `<option value="${n.name}" ${slot.nature === n.name ? 'selected' : ''}>${n.name}</option>`
@@ -341,27 +330,27 @@
     if (slot.pokemon) {
       const rows = STAT_KEYS.map(key => {
         const base = slot.pokemon.baseStats[key];
-        const iv   = slot.ivs[key];
-        const ev   = slot.evs[key];
-        const real = calcStat(base, iv, ev, slot.lv, slot.nature, key);
-        const nUp   = nd?.plus  === key ? '<span class="text-red-500 font-bold ml-1">↑</span>' : '';
-        const nDown = nd?.minus === key ? '<span class="text-blue-500 font-bold ml-1">↓</span>' : '';
+        const ap   = slot.aps[key];
+        const real = calcStat(base, ap, slot.nature, key);
+        const nUp   = nd?.plus  === key ? '<span class="text-red-500 font-bold ml-0.5">↑</span>' : '';
+        const nDown = nd?.minus === key ? '<span class="text-blue-500 font-bold ml-0.5">↓</span>' : '';
         const isSpe = key === 'spe';
         const rowBg = isSpe ? (ac === 'blue' ? 'bg-blue-100' : 'bg-red-100') : '';
+        const maxAP = Math.min(AP_MAX_SINGLE, ap + remainAP);
         return `<tr class="${rowBg}">
           <td class="py-1.5 pr-2 text-xs font-medium text-gray-600 whitespace-nowrap">
             ${STAT_LABELS[key]}${isSpe ? ' ⚡' : ''}
           </td>
           <td class="py-1.5 pr-3 text-xs text-center text-gray-500">${base}</td>
-          <td class="py-1.5 pr-2">
-            <input type="number" value="${iv}" min="0" max="31"
-              class="w-12 border rounded px-1 py-0.5 text-xs text-center"
-              onchange="updateSlotIV('${side}',${activeSlot},'${key}',this.value)">
-          </td>
           <td class="py-1.5 pr-3">
-            <input type="number" value="${ev}" min="0" max="252"
-              class="w-14 border rounded px-1 py-0.5 text-xs text-center"
-              onchange="updateSlotEV('${side}',${activeSlot},'${key}',this.value)">
+            <div class="flex items-center gap-2 min-w-[140px]">
+              <input type="range" value="${ap}" min="0" max="${maxAP}"
+                class="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-${ac}-500"
+                oninput="updateSlotAP('${side}',${activeSlot},'${key}',this.value)">
+              <input type="number" value="${ap}" min="0" max="${maxAP}"
+                class="w-10 border rounded px-1 py-0.5 text-xs text-center shrink-0"
+                onchange="updateSlotAP('${side}',${activeSlot},'${key}',this.value)">
+            </div>
           </td>
           <td class="py-1.5 text-sm font-bold text-${ac}-700 whitespace-nowrap">
             ${real}${nUp}${nDown}
@@ -370,19 +359,19 @@
       }).join('');
 
       statsTable = `
-        <div class="flex gap-3 mb-3 flex-wrap">
-          <div>
-            <label class="text-xs text-gray-500 block mb-1">レベル</label>
-            <input type="number" value="${slot.lv}" min="1" max="100"
-              class="w-16 border rounded px-2 py-1 text-sm"
-              onchange="updateSlotLv('${side}',${activeSlot},this.value)">
-          </div>
+        <div class="flex items-center gap-3 mb-3 flex-wrap">
           <div>
             <label class="text-xs text-gray-500 block mb-1">性格</label>
             <select class="border rounded px-2 py-1 text-sm"
               onchange="updateSlotNature('${side}',${activeSlot},this.value)">
               ${natureOpts}
             </select>
+          </div>
+          <div class="ml-auto text-right">
+            <p class="text-xs text-gray-400">残り能力ポイント</p>
+            <p class="text-2xl font-black ${remainAP <= 0 ? 'text-red-500' : 'text-gray-700'}">${remainAP}
+              <span class="text-sm font-normal text-gray-400">/ ${AP_MAX_TOTAL}</span>
+            </p>
           </div>
         </div>
         <div class="overflow-x-auto">
@@ -391,8 +380,7 @@
               <tr class="text-gray-400 border-b">
                 <th class="text-left pr-2 py-1 font-normal">ステータス</th>
                 <th class="pr-3 py-1 font-normal">種族値</th>
-                <th class="pr-2 py-1 font-normal">個体値</th>
-                <th class="pr-3 py-1 font-normal">努力値</th>
+                <th class="pr-3 py-1 font-normal">能力ポイント<br><span class="text-gray-300">（合計${AP_MAX_TOTAL}・最大${AP_MAX_SINGLE}）</span></th>
                 <th class="py-1 font-normal">実数値</th>
               </tr>
             </thead>
@@ -423,20 +411,20 @@
     return side === 'my' ? myParties[myActive][idx] : oppParty[idx];
   }
 
-  function updateSlotLv(side, idx, val) {
-    getSlot(side, idx).lv = Math.min(100, Math.max(1, parseInt(val) || 50));
-    afterSlotUpdate(side, idx);
-  }
   function updateSlotNature(side, idx, val) {
     getSlot(side, idx).nature = val;
     afterSlotUpdate(side, idx);
   }
-  function updateSlotIV(side, idx, key, val) {
-    getSlot(side, idx).ivs[key] = Math.min(31,  Math.max(0, parseInt(val) || 0));
-    afterSlotUpdate(side, idx);
-  }
-  function updateSlotEV(side, idx, key, val) {
-    getSlot(side, idx).evs[key] = Math.min(252, Math.max(0, parseInt(val) || 0));
+
+  function updateSlotAP(side, idx, key, val) {
+    const slot = getSlot(side, idx);
+    let newVal = Math.min(AP_MAX_SINGLE, Math.max(0, parseInt(val) || 0));
+    // 合計上限チェック
+    const totalOther = Object.entries(slot.aps)
+      .filter(([k]) => k !== key)
+      .reduce((s, [, v]) => s + v, 0);
+    newVal = Math.min(newVal, AP_MAX_TOTAL - totalOther);
+    slot.aps[key] = newVal;
     afterSlotUpdate(side, idx);
   }
 
@@ -459,8 +447,7 @@
 
   function closeModal() {
     document.getElementById('modal').style.display = 'none';
-    modalSide    = null;
-    modalSlotIdx = null;
+    modalSide = null; modalSlotIdx = null;
   }
 
   function clearSlot() {
@@ -498,19 +485,17 @@
       const btn = document.createElement('button');
       btn.className = 'flex flex-col items-center p-1.5 rounded-lg hover:bg-blue-50 transition text-center';
       const img = document.createElement('img');
-      img.src   = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`;
-      img.alt   = p.name;
+      img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`;
+      img.alt = p.name;
       img.className = 'w-12 h-12 object-contain';
       img.onerror = () => { img.style.display = 'none'; };
       const idEl = document.createElement('span');
-      idEl.className   = 'text-xs text-gray-400';
+      idEl.className = 'text-xs text-gray-400';
       idEl.textContent = `#${p.id}`;
       const naEl = document.createElement('span');
-      naEl.className   = 'text-xs font-medium text-gray-700';
+      naEl.className = 'text-xs font-medium text-gray-700';
       naEl.textContent = p.ja || p.name;
-      btn.appendChild(img);
-      btn.appendChild(idEl);
-      btn.appendChild(naEl);
+      btn.appendChild(img); btn.appendChild(idEl); btn.appendChild(naEl);
       btn.onclick = () => fetchAndSetPokemon(p.name);
       resultsEl.appendChild(btn);
     });
@@ -519,7 +504,6 @@
   async function fetchAndSetPokemon(name) {
     const resultsEl = document.getElementById('modal-results');
     resultsEl.innerHTML = '<p class="text-gray-400 text-sm p-4 w-full text-center">読み込み中...</p>';
-
     try {
       const [pokemonRes, speciesRes] = await Promise.all([
         fetch(`https://pokeapi.co/api/v2/pokemon/${name}`),
@@ -531,10 +515,8 @@
       const jaName = species.names.find(n => n.language.name === 'ja-Hrkt')?.name
         || species.names.find(n => n.language.name === 'ja')?.name
         || pokemon.name;
-
       const sprite = pokemon.sprites.other?.['official-artwork']?.front_default
         || pokemon.sprites.front_default || '';
-
       const baseStats = {
         hp:  pokemon.stats[0].base_stat,
         atk: pokemon.stats[1].base_stat,
@@ -558,13 +540,15 @@
     }
   }
 
-  // ===== 実数値計算 =====
-  function calcStat(base, iv, ev, lv, natureName, key) {
-    const evB = Math.floor(ev / 4);
+  // ===== 実数値計算（ポケモンチャンピオンズ仕様）=====
+  // HP: floor((種族値×2 + 31 + AP×2) × 50/100) + 60
+  // 他: floor((floor((種族値×2 + 31 + AP×2) × 50/100) + 5) × 性格補正)
+  function calcStat(base, ap, natureName, key) {
+    const inner = Math.floor((base * 2 + FIXED_IV + ap * 2) * FIXED_LV / 100);
     if (key === 'hp') {
-      return Math.floor((base * 2 + iv + evB) * lv / 100) + lv + 10;
+      return inner + 60;
     }
-    const raw = Math.floor((base * 2 + iv + evB) * lv / 100) + 5;
+    const raw = inner + 5;
     const nd  = NATURES.find(n => n.name === natureName);
     const m   = nd?.plus === key ? 1.1 : nd?.minus === key ? 0.9 : 1.0;
     return Math.floor(raw * m);
@@ -576,22 +560,21 @@
 
     myParties[myActive].forEach((slot, i) => {
       if (!slot.pokemon) return;
-      const spe = calcStat(slot.pokemon.baseStats.spe, slot.ivs.spe, slot.evs.spe, slot.lv, slot.nature, 'spe');
+      const spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
       const nd  = NATURES.find(n => n.name === slot.nature);
       const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
-      entries.push({ pokemon: slot.pokemon, spe, lv: slot.lv, nature: slot.nature, tag, baseSpe: slot.pokemon.baseStats.spe, side: 'my', idx: i });
+      entries.push({ pokemon: slot.pokemon, spe, nature: slot.nature, tag, baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'my', idx: i });
     });
 
     oppParty.forEach((slot, i) => {
       if (!slot.pokemon) return;
-      const spe = calcStat(slot.pokemon.baseStats.spe, slot.ivs.spe, slot.evs.spe, slot.lv, slot.nature, 'spe');
+      const spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
       const nd  = NATURES.find(n => n.name === slot.nature);
       const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
-      entries.push({ pokemon: slot.pokemon, spe, lv: slot.lv, nature: slot.nature, tag, baseSpe: slot.pokemon.baseStats.spe, side: 'opp', idx: i });
+      entries.push({ pokemon: slot.pokemon, spe, nature: slot.nature, tag, baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'opp', idx: i });
     });
 
     const rankEl = document.getElementById('speed-ranking');
-
     if (entries.length === 0) {
       rankEl.innerHTML = '<p class="text-gray-400 text-center py-10">パーティにポケモンを登録してください</p>';
       return;
@@ -599,13 +582,11 @@
 
     entries.sort((a, b) => b.spe - a.spe);
     const maxSpe = entries[0].spe;
-
-    // 同速グループを検出
-    const speSet = {};
-    entries.forEach(e => { speSet[e.spe] = (speSet[e.spe] || 0) + 1; });
+    const speCount = {};
+    entries.forEach(e => { speCount[e.spe] = (speCount[e.spe] || 0) + 1; });
 
     rankEl.innerHTML = '';
-    let rank    = 1;
+    let rank = 1;
     let prevSpe = null;
 
     entries.forEach((e, i) => {
@@ -614,11 +595,9 @@
 
       const isMy    = e.side === 'my';
       const pct     = Math.round(e.spe / maxSpe * 100);
-      const isTied  = speSet[e.spe] > 1;
-
-      // 色はstatic classで記述（TailwindのJITスキャン対策）
+      const isTied  = speCount[e.spe] > 1;
       const barClass  = isMy ? 'bg-blue-500'  : 'bg-red-400';
-      const tagBg     = isMy ? 'bg-blue-100 text-blue-600'  : 'bg-red-100 text-red-600';
+      const tagBg     = isMy ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600';
       const teamLabel = isMy ? '自分' : '相手';
       const rankColor = rank === 1 ? 'text-yellow-500' : rank <= 3 ? 'text-gray-500' : 'text-gray-300';
 
@@ -627,15 +606,15 @@
       row.innerHTML = `
         <div class="text-base font-black ${rankColor} w-7 text-center shrink-0">${rank}</div>
         <img src="${e.pokemon.sprite}" alt="" class="w-11 h-11 object-contain shrink-0">
-        <div class="w-28 shrink-0 min-w-0">
+        <div class="w-32 shrink-0 min-w-0">
           <p class="text-sm font-bold text-gray-800 leading-tight truncate">${e.pokemon.jaName}</p>
-          <p class="text-xs text-gray-400">Lv${e.lv}・${e.nature}・種${e.baseSpe}</p>
+          <p class="text-xs text-gray-400">${e.nature}・種${e.baseSpe}・AP${e.apSpe}</p>
         </div>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <div class="flex-1 bg-gray-100 rounded-full h-7 overflow-hidden relative min-w-0">
               <div class="${barClass} h-full rounded-full flex items-center px-3"
-                style="width:${pct}%; min-width:fit-content; transition: width 0.3s ease;">
+                style="width:${Math.max(pct,8)}%; transition: width 0.3s ease;">
                 <span class="text-white text-sm font-bold whitespace-nowrap">${e.spe}${e.tag}</span>
               </div>
             </div>
