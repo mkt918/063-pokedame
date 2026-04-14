@@ -955,6 +955,7 @@
       }
     }
     timelineLabels.innerHTML = labelHTML;
+    timelineLabels.className = "absolute left-6 right-6 bottom-2 flex justify-between text-xs text-gray-400 font-mono";
 
     // ポケモンピン配置
     const speGroups = {};
@@ -976,14 +977,14 @@
         pin.className = 'absolute bottom-0 flex flex-col items-center group z-20';
         pin.style.left = `${left}%`;
         pin.style.transform = 'translateX(-50%)';
-        const yOffset = gi * 30 + 10; 
+        const yOffset = gi * 35 + 15; 
 
         pin.innerHTML = `
           <div class="relative flex flex-col-reverse items-center" style="margin-bottom: ${yOffset}px">
             <div class="bg-white border-2 border-blue-500 rounded-full p-0.5 shadow-sm hover:scale-125 transition-transform cursor-help">
-              <img src="${e.pokemon.sprite}" class="w-7 h-7 object-contain">
+              <img src="${e.pokemon.sprite}" class="w-8 h-8 object-contain">
             </div>
-            <div class="bg-blue-500 text-white font-mono font-bold text-[8px] px-1 rounded absolute -top-3 whitespace-nowrap z-30">
+            <div class="bg-blue-500 text-white font-mono font-bold text-[11px] px-1.5 py-0.5 rounded absolute -top-4 whitespace-nowrap z-30 shadow-sm">
               ${spe}
             </div>
             <div class="w-0.5 bg-blue-500 opacity-20 absolute -z-10" style="height: ${yOffset}px; bottom: -${yOffset}px"></div>
@@ -998,16 +999,16 @@
         pin.className = 'absolute top-0 flex flex-col items-center group z-10';
         pin.style.left = `${left}%`;
         pin.style.transform = 'translateX(-50%)';
-        const yOffset = gi * 30 + 10;
+        const yOffset = gi * 40 + 15;
 
         pin.innerHTML = `
           <div class="relative flex flex-col items-center" style="margin-top: ${yOffset}px">
             <div class="bg-white border-2 border-red-400 rounded-full p-0.5 shadow-sm hover:scale-125 transition-transform cursor-help">
-              <img src="${e.pokemon.sprite}" class="w-7 h-7 object-contain grayscale-[0.3]">
+              <img src="${e.pokemon.sprite}" class="w-8 h-8 object-contain grayscale-[0.3]">
             </div>
-            <div class="bg-red-400 text-white font-mono font-bold text-[8px] px-1 rounded absolute -bottom-5 whitespace-nowrap z-30 flex flex-col items-center leading-none py-0.5">
+            <div class="bg-red-400 text-white font-mono font-bold text-[11px] px-1.5 rounded absolute -bottom-7 whitespace-nowrap z-30 flex flex-col items-center leading-tight py-0.5 shadow-sm">
               <span>${spe}</span>
-              <span class="text-[6px] opacity-90 scale-90">${e.virtual || ''}</span>
+              <span class="text-[9px] opacity-90">${e.virtual || ''}</span>
             </div>
             <div class="w-0.5 bg-red-400 opacity-20 absolute -z-10" style="height: ${yOffset}px; top: -${yOffset}px"></div>
           </div>
