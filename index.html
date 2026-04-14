@@ -134,7 +134,8 @@
   const emptySlot  = () => ({
     pokemon: null,
     nature: 'まじめ',
-    aps: { hp:0, atk:0, def:0, spa:0, spd:0, spe:0 }
+    aps: { hp:0, atk:0, def:0, spa:0, spd:0, spe:0 },
+    speMod: 1.0
   });
   const emptyParty = () => Array.from({length:6}, emptySlot);
 
@@ -225,7 +226,8 @@
     return {
       ...base,
       ...saved,
-      aps: {...base.aps, ...(saved.aps || {})}
+      aps: {...base.aps, ...(saved.aps || {})},
+      speMod: saved.speMod || 1.0
     };
   }
 
@@ -271,16 +273,18 @@
         : 'border-2 border-gray-200 rounded-xl p-2 text-center cursor-pointer hover:border-gray-400 transition';
 
       if (slot.pokemon) {
-        const spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+        let spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+        if (slot.speMod && slot.speMod !== 1.0) spe = Math.floor(spe * slot.speMod);
         const nd  = NATURES.find(n => n.name === slot.nature);
         const speTag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
+        const modTag = slot.speMod === 1.5 ? ' (SC)' : slot.speMod === 2.0 ? ' (TW)' : '';
         const speColor = side === 'my' ? 'text-blue-600' : 'text-red-600';
         const totalAP = Object.values(slot.aps).reduce((s,v) => s+v, 0);
         div.innerHTML = `
           <img src="${slot.pokemon.sprite}" alt="" class="w-14 h-14 mx-auto object-contain">
           <p class="text-xs font-bold text-gray-700 leading-tight mt-1 truncate" title="${slot.pokemon.jaName}">${slot.pokemon.jaName}</p>
           <p class="text-xs text-gray-400">${slot.nature}・AP${totalAP}</p>
-          <p class="text-sm font-bold ${speColor}">⚡${spe}${speTag}</p>
+          <p class="text-sm font-bold ${speColor}">⚡${spe}${speTag}${modTag}</p>
         `;
       } else {
         div.innerHTML = `
@@ -357,9 +361,16 @@
                 MAX
               </button>
             </div>
+            ${isSpe ? `
+              <div class="flex gap-1 mt-1 text-[10px]">
+                <button onclick="updateSlotSpeMod('${side}',${activeSlot},1.0)" class="px-1.5 py-0.5 rounded border ${slot.speMod===1.0?'bg-gray-500 text-white':'bg-white text-gray-500'}">x1.0</button>
+                <button onclick="updateSlotSpeMod('${side}',${activeSlot},1.5)" class="px-1.5 py-0.5 rounded border ${slot.speMod===1.5?'bg-blue-500 text-white':'bg-white text-gray-500'}">x1.5 (スカーフ)</button>
+                <button onclick="updateSlotSpeMod('${side}',${activeSlot},2.0)" class="px-1.5 py-0.5 rounded border ${slot.speMod===2.0?'bg-red-500 text-white':'bg-white text-gray-500'}">x2.0 (追風/水水)</button>
+              </div>
+            ` : ''}
           </td>
           <td id="${side}-ap-${key}-real" class="py-1.5 text-sm font-bold text-${ac}-700 whitespace-nowrap">
-            ${real}${nUp}${nDown}
+            ${isSpe && slot.speMod !== 1.0 ? Math.floor(real * slot.speMod) : real}${nUp}${nDown}
           </td>
         </tr>`;
       }).join('');
@@ -456,7 +467,8 @@
     if (range)  range.value  = newVal;
     if (number) number.value = newVal;
     if (real && slot.pokemon) {
-      const realVal = calcStat(slot.pokemon.baseStats[key], newVal, slot.nature, key);
+      let realVal = calcStat(slot.pokemon.baseStats[key], newVal, slot.nature, key);
+      if (key === 'spe' && slot.speMod && slot.speMod !== 1.0) realVal = Math.floor(realVal * slot.speMod);
       const nd  = NATURES.find(n => n.name === slot.nature);
       const nUp   = nd?.plus  === key ? '<span class="text-red-500 font-bold ml-0.5">↑</span>' : '';
       const nDown = nd?.minus === key ? '<span class="text-blue-500 font-bold ml-0.5">↓</span>' : '';
@@ -485,6 +497,12 @@
     const totalOther = Object.entries(slot.aps).filter(([k]) => k !== key).reduce((s, [, v]) => s + v, 0);
     const maxVal = Math.min(AP_MAX_SINGLE, AP_MAX_TOTAL - totalOther);
     updateSlotAP(side, idx, key, maxVal);
+  }
+
+  function updateSlotSpeMod(side, idx, mod) {
+    const slot = getSlot(side, idx);
+    slot.speMod = mod;
+    afterSlotUpdate(side, idx);
   }
 
   // ===== モーダル =====
@@ -612,18 +630,22 @@
 
     myParties[myActive].forEach((slot, i) => {
       if (!slot.pokemon) return;
-      const spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+      let spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+      if (slot.speMod && slot.speMod !== 1.0) spe = Math.floor(spe * slot.speMod);
       const nd  = NATURES.find(n => n.name === slot.nature);
       const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
-      entries.push({ pokemon: slot.pokemon, spe, nature: slot.nature, tag, baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'my', idx: i });
+      const modTag = slot.speMod === 1.5 ? '(SC)' : slot.speMod === 2.0 ? '(TW)' : '';
+      entries.push({ pokemon: slot.pokemon, spe, nature: slot.nature, tag: tag + modTag, baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'my', idx: i });
     });
 
     oppParty.forEach((slot, i) => {
       if (!slot.pokemon) return;
-      const spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+      let spe = calcStat(slot.pokemon.baseStats.spe, slot.aps.spe, slot.nature, 'spe');
+      if (slot.speMod && slot.speMod !== 1.0) spe = Math.floor(spe * slot.speMod);
       const nd  = NATURES.find(n => n.name === slot.nature);
       const tag = nd?.plus === 'spe' ? '↑' : nd?.minus === 'spe' ? '↓' : '';
-      entries.push({ pokemon: slot.pokemon, spe, nature: slot.nature, tag, baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'opp', idx: i });
+      const modTag = slot.speMod === 1.5 ? '(SC)' : slot.speMod === 2.0 ? '(TW)' : '';
+      entries.push({ pokemon: slot.pokemon, spe, nature: slot.nature, tag: tag + modTag, baseSpe: slot.pokemon.baseStats.spe, apSpe: slot.aps.spe, side: 'opp', idx: i });
     });
 
     const rankEl = document.getElementById('speed-ranking');
